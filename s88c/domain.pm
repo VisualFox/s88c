@@ -86,7 +86,7 @@ sub initApp {
 
 			#generate prefixes...
 			my @prefixes = ('app');
-			my $new_prefix = &promptUser("Add a new prefix to this db (@prefixes)? (yes|no)", 'no');
+			my $new_prefix = &promptUser("Add a new prefix to this db (current prefixes: @prefixes)? (yes|no)", 'no');
 
             while($new_prefix eq 'yes') {
                 my $prefix = &promptUser('prefix', '');
@@ -95,7 +95,7 @@ sub initApp {
                     push (@prefixes, $prefix);
                 }
 
-                $new_prefix = &promptUser("Add a new prefix to this db (@prefixes)? (yes|no)", 'no');
+                $new_prefix = &promptUser("Add a new prefix to this db (current prefixes: @prefixes)? (yes|no)", 'no');
             }
 
 			#save db file...
