@@ -1,0 +1,5 @@
+SHELL="{$envShell}"
+PATH="{$envPath}"
+MAILTO=""
+
+{$m} *  * * *    {$envUser}   {$drush} --root={$path} --uri={$domain} --quiet core-cron

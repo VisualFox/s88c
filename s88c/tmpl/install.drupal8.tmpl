@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cd  {$dir}
+drush dl --destination={$dir} drupal-8
+mv $(find . -maxdepth 1 -type d -name '[^.]?*' -printf %f -quit) drupal-8
+ln -s drupal-8 {$app}
+drush --root={$dir}/{$app} site-install standard --account-name={$duser} --account-pass={$dpass} --db-url=mysql://{$user}:{$pass}@mysql/app_{$db}
+
+chown -R www-data:www-data drupal-8
+chown -h www-data:www-data {$app}

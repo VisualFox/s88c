@@ -1,0 +1,6 @@
+SHELL="{$envShell}"
+PATH="{$envPath}"
+MAILTO=""
+
+{$mdb} {$hdb}   * * *   {$envUser}  {$perl} {$path}/db.auto.backup/backup.pl
+{$mfile} {$hfile}   * * {$dfile}    {$envUser}  {$perl} {$path}/files.auto.backup/backup.pl

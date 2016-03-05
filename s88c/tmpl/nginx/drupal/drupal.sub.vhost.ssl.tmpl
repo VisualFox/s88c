@@ -1,0 +1,147 @@
+# -*- mode: nginx; mode: flyspell-prog;  ispell-current-dictionary: american -*-
+### Configuration for {$domain}.
+
+## non-SSL
+server \{
+    listen 80;
+    server_name {$subdomain}.{$domain};
+
+    location '/.well-known/acme-challenge' \{
+        default_type "text/plain";
+        root /tmp/letsencrypt/www;
+    \}
+
+    location / \{
+        return 301 https://www.{$domain}$request_uri;
+    \}
+\}
+
+## HTTPS server.
+server \{
+    listen 443 ssl http2;
+    server_name {$subdomain}.{$domain};
+    root /var/www/vhosts/{$domain}/subdomains/{$subdomain}/httpdocs/app;
+
+	# SSL
+    ssl on;
+
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2; # Dropping SSLv3, ref: POODLE
+    ssl_prefer_server_ciphers on;
+
+    ssl_ciphers 'ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-SHA256:AES128-SHA256:AES256-SHA:AES128-SHA:DES-CBC3-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4';
+
+    ssl_session_cache builtin:1000 shared:SSL:10m;
+
+    ## Strong SSL Security
+    ## https://raymii.org/s/tutorials/Strong_SSL_Security_On_nginx.html
+    #ssl_certificate /etc/nginx/ssl/{$domain}/fullchain.pem;
+    #ssl_certificate_key /etc/nginx/ssl/{$domain}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/{$domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{$domain}/privkey.pem;
+
+    ## [Optional] Generate a stronger DHE parameter (recommended):
+    ##   cd /etc/ssl/certs
+    ##   openssl dhparam -out dhparam.pem 2048
+    ##
+    ssl_dhparam /etc/nginx/ssl/{$domain}/dhparam.pem;
+
+	## hardening: https://doc.owncloud.org/server/8.2/admin_manual/configuration_server/harden_server.html
+	server_tokens off;
+	add_header Strict-Transport-Security "max-age=15768000; includeSubDomains; preload;";
+  	add_header X-Content-Type-Options nosniff;
+  	add_header X-Frame-Options "SAMEORIGIN";
+  	add_header X-XSS-Protection "1; mode=block";
+  	add_header X-Robots-Tag none;
+
+	## Disable gzip to avoid the removal of the ETag header
+	## If you use https make sure you disable gzip compression
+    ## to be safe against BREACH attack.
+    gzip off;
+
+    ## lets encrypt
+    ## We use ^~ here, so that we don't check other regexes (for speed-up). We actually MUST cancel other regex checks.
+    location ^~ /.well-known/acme-challenge/ \{
+        default_type "text/plain";
+        root /tmp/letsencrypt/www;
+    \}
+
+    location = /favicon.ico \{
+        log_not_found off;
+        access_log off;
+    \}
+
+    location = /robots.txt \{
+        allow all;
+        log_not_found off;
+        access_log off;
+    \}
+
+    # no access
+    location ~* \.(txt|log)$ \{
+        deny all;
+    \}
+
+    location ~ \..*/.*\.php$ \{
+        return 403;
+    \}
+
+    location ~ ^/sites/.*/private/ \{
+        return 403;
+    \}
+
+    # Allow "Well-Known URIs" as per RFC 5785
+    location ~* ^/.well-known/ \{
+        allow all;
+    \}
+
+    # Block access to "hidden" files and directories whose names begin with a
+    # period. This includes directories used by version control systems such
+    # as Subversion or Git to store control files.
+    location ~ (^|/)\. \{
+        return 403;
+    \}
+
+    location / \{
+        # try_files $uri @rewrite; # For Drupal <= 6
+        try_files $uri /index.php?$query_string; # For Drupal >= 7
+    \}
+
+    location @rewrite \{
+        rewrite ^/(.*)$ /index.php?q=$1;
+    \}
+
+    # Don't allow direct access to PHP files in the vendor directory.
+    location ~ /vendor/.*\.php$ \{
+        deny all;
+        return 404;
+    \}
+
+    # In Drupal 8, we must also match new paths where the '.php' appears in the middle,
+    # such as update.php/selection. The rule we use is strict, and only allows this pattern
+    # with the update.php front controller.  This allows legacy path aliases in the form of
+    # blog/index.php/legacy-path to continue to route to Drupal nodes. If you do not have
+    # any paths like that, then you might prefer to use a laxer rule, such as:
+    #   location ~ \.php(/|$) \{
+    # The laxer rule will continue to work if Drupal uses this new URL pattern with front
+    # controllers other than update.php in a future release.
+    location ~ '\.php$|^/update.php' \{
+        fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+        #NOTE: You should have "cgi.fix_pathinfo = 0;" in php.ini
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_intercept_errors on;
+        fastcgi_pass php:9000;
+    \}
+
+    # Fighting with Styles? This little gem is amazing.
+    # location ~ ^/sites/.*/files/imagecache/ \{ # For Drupal <= 6
+    location ~ ^/sites/.*/files/styles/ \{ # For Drupal >= 7
+        try_files $uri @rewrite;
+    \}
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ \{
+        expires max;
+        log_not_found off;
+    \}
+\}

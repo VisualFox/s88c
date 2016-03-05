@@ -1,0 +1,200 @@
+#!/usr/bin/perl -w
+
+#--------------------------------------------
+
+use strict;
+use warnings;
+use Switch;
+
+#--------------------------------------------
+
+my $num_args = $#ARGV + 1;
+if ($num_args == 0) \{
+    print "\nUsage: db.pl create|delete|drop|info arguments\n";
+    exit;
+\}
+
+my $action = $ARGV[0];
+
+switch ($action) \{
+    case 'host'
+    \{
+        print dbGetHost();
+    \}
+    case 'database'
+    \{
+        print dbGetDb();
+    \}
+    case 'username'
+    \{
+        print dbGetUser();
+    \}
+    case 'password'
+    \{
+        print dbGetPass();
+    \}
+    case 'create'
+    \{
+        if ($num_args != 4) \{
+            print "\nUsage: db.pl create mysql_host mysql_user mysql_password\n";
+            exit;
+        \}
+
+        dbCreate($ARGV[1], $ARGV[2], $ARGV[3]);
+    \}
+    case 'delete'
+    \{
+        if ($num_args != 4) \{
+            print "\nUsage: db.pl delete mysql_host mysql_user mysql_password\n";
+            exit;
+        \}
+
+        dbDelete($ARGV[1], $ARGV[2], $ARGV[3]);
+    \}
+    case 'drop'
+    \{
+        dbDropAll();
+    \}
+    case 'info'
+    \{
+        dbInfo();
+    \}
+\}
+
+#--------------------------------------------
+
+sub dbGetHost \{
+	return '{$host}';
+\}
+
+sub dbGetDb \{
+	return '{$db}';
+\}
+
+sub dbGetPrefixes \{
+	return qw({$prefixes});
+\}
+
+sub dbGetUser \{
+	return '{$user}';
+\}
+
+sub dbGetPass \{
+	return '{$pass}';
+\}
+
+sub dbIsTCP \{
+	return '{$tcp}';
+\}
+
+sub dbCreate \{
+    my $main_host = shift;
+    my $main_user = shift;
+    my $main_pass = shift;
+
+    my $db = dbGetDb();
+    my $user = dbGetUser();
+    my $pass = dbGetPass();
+    my @prefixes = dbGetPrefixes();
+    my $prefix;
+
+    foreach $prefix (@prefixes) \{
+	    dbRun(
+	        "CREATE DATABASE $prefix".'_'."$db CHARACTER SET utf8 COLLATE utf8_general_ci; GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, SHOW VIEW, EVENT, TRIGGER ON $prefix".'_'."$db.* TO '$user'\@'%' IDENTIFIED BY '$pass';",
+            $main_host,
+            $main_user,
+            $main_pass
+	    );
+	\}
+\}
+
+sub dbDelete \{
+    my $main_host = shift;
+    my $main_user = shift;
+    my $main_pass = shift;
+
+    my $db = dbGetDb();
+    my $user = dbGetUser();
+    my $pass = dbGetPass();
+    my @prefixes = dbGetPrefixes();
+    my $prefix;
+
+    foreach $prefix (@prefixes) \{
+        dbRun(
+            "DROP DATABASE $prefix".'_'."$db;",
+            $main_host,
+            $main_user,
+            $main_pass
+        );
+    \}
+
+	dbRun(
+        "DROP USER '$user'\@'%';",
+        $main_host,
+        $main_user,
+        $main_pass
+	);
+\}
+
+sub dbDropAll \{
+    my $db = dbGetDb();
+    my $host = dbGetHost();
+    my $user = dbGetUser();
+    my $pass = dbGetPass();
+    my @prefixes = dbGetPrefixes();
+    my $prefix;
+
+    foreach $prefix (@prefixes) \{
+        if(dbIsTCP()) \{
+            system "mysqldump -h$host -u$user -p$pass --protocol=TCP --add-drop-table --no-data $prefix".'_'."$db | grep ^DROP | mysql -h$host -u$user -p$pass --protocol=TCP $prefix".'_'."$db";
+        \} else \{
+            system "mysqldump -h$host -u$user -p$pass --add-drop-table --no-data $prefix".'_'."$db | grep ^DROP | mysql -h$host -u$user -p$pass $prefix".'_'."$db";
+        \}
+	\}
+\}
+
+sub dbInfo \{
+    my $db = dbGetDb();
+    my $host = dbGetHost();
+    my $user = dbGetUser();
+    my $pass = dbGetPass();
+    my @prefixes = dbGetPrefixes();
+    my $prefix;
+
+	print "\n\n*****************************************************\n";
+
+    foreach $prefix (@prefixes) \{
+	    print "\nDatabase: $prefix".'_'."$db\n";
+	\}
+
+    print "\n";
+
+	print "\nHostname: $host\n";
+	print "\nUser: $user\n";
+	print "\nPassword: $pass\n";
+
+	if(dbIsTCP()) \{
+	    print "\nUse TCP Only\n";
+	\}
+
+	print "\n*****************************************************\n\n";
+\}
+
+sub dbRun \{
+    my $cmd = shift;
+
+    my $host = shift;
+    my $user = shift;
+    my $password = shift;
+
+	if($host && $user && $password) \{
+	    if(dbIsTCP()) \{
+	        system "mysql -h$host -u$user -p$password --protocol=TCP -e \"$cmd\"";
+	    \} else \{
+		    system "mysql -h$host -u$user -p$password -e \"$cmd\"";
+		\}
+	\}
+	else \{
+		printError('No admin user and password set for mysql');
+	\}
+\}
