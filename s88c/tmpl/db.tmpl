@@ -8,56 +8,61 @@ use Switch;
 
 #--------------------------------------------
 
-my $num_args = $#ARGV + 1;
-if ($num_args == 0) \{
-    print "\nUsage: db.pl create|delete|drop|info arguments\n";
-    exit;
-\}
+#check if we are calling this file directly from the command line
+__PACKAGE__->main(@ARGV) unless caller;
 
-my $action = $ARGV[0];
+sub main \{
+    my $num_args = $#ARGV + 1;
+    if ($num_args == 0) \{
+        print "\nUsage: db.pl create|delete|drop|info arguments\n";
+        exit;
+    \}
 
-switch ($action) \{
-    case 'host'
-    \{
-        print dbGetHost();
-    \}
-    case 'database'
-    \{
-        print dbGetDb();
-    \}
-    case 'username'
-    \{
-        print dbGetUser();
-    \}
-    case 'password'
-    \{
-        print dbGetPass();
-    \}
-    case 'create'
-    \{
-        if ($num_args != 4) \{
-            print "\nUsage: db.pl create mysql_host mysql_user mysql_password\n";
-            exit;
+    my $action = $ARGV[0];
+
+    switch ($action) \{
+        case 'host'
+        \{
+            print dbGetHost();
         \}
-
-        dbCreate($ARGV[1], $ARGV[2], $ARGV[3]);
-    \}
-    case 'delete'
-    \{
-        if ($num_args != 4) \{
-            print "\nUsage: db.pl delete mysql_host mysql_user mysql_password\n";
-            exit;
+        case 'database'
+        \{
+            print dbGetDb();
         \}
+        case 'username'
+        \{
+            print dbGetUser();
+        \}
+        case 'password'
+        \{
+            print dbGetPass();
+        \}
+        case 'create'
+        \{
+            if ($num_args != 4) \{
+                print "\nUsage: db.pl create mysql_host mysql_user mysql_password\n";
+                exit;
+            \}
 
-        dbDelete($ARGV[1], $ARGV[2], $ARGV[3]);
-    \}
-    case 'drop'
-    \{
-        dbDropAll();
-    \}
-    case 'info'
-    \{
-        dbInfo();
+            dbCreate($ARGV[1], $ARGV[2], $ARGV[3]);
+        \}
+        case 'delete'
+        \{
+            if ($num_args != 4) \{
+                print "\nUsage: db.pl delete mysql_host mysql_user mysql_password\n";
+                exit;
+            \}
+
+            dbDelete($ARGV[1], $ARGV[2], $ARGV[3]);
+        \}
+        case 'drop'
+        \{
+            dbDropAll();
+        \}
+        case 'info'
+        \{
+            dbInfo();
+        \}
     \}
 \}
 
